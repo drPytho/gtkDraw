@@ -3,66 +3,18 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk
 from enum import Enum
 import math
-
-# Undo redo stack
-# Based on singaly linked list
-
-
-# Undo tree
-class DoList(object):
-
-    class Iter:
-        def __init__(self, li, end):
-            self.__li = li
-            if (end is not None and end < len(li)):
-                self.__end = end
-            else:
-                self.__end = len(li)-1
-            self.__current = 0
-
-        def __next__(self):
-            self.__current += 1
-            if (self.__current >= self.__end):
-                raise StopIteration()
-            else:
-                return self.__li[self.__current]
-
-    def __init__(self):
-        self.__actions = []
-        self.__pointer = -1
-
-    def do(self, action):
-
-        if (self.__pointer < len(self.__actions)-1):
-            self.__actions = self.__actions[:self.__pointer+1]
-
-        self.__actions.append(action)
-        self.__pointer = len(self.__actions)
-
-    def undo(self):
-        if (self.__pointer < 0):
-            return False
-        else:
-            self.__pointer -= 1
-            return True
-
-    def redo(self):
-        if (self.__pointer == len(self.__actions)-1):
-            return False
-        else:
-            self.__pointer += 1
-            return True
-
-    def __iter__(self):
-        return self.Iter(self.__actions, self.__pointer)
-
+from dolist import DoList
 
 class Color(Enum):
-    Red = "#FF0000"
-    Green = "#00FF00"
-    Blue = "#0000FF"
-    Black = "#000000"
-    White = "#FFFFFF"
+    """
+    Enum Color class for easy access to different
+    colors.
+    """
+    Red = [1, 0, 0, 1]
+    Green = [0, 1, 0, 1]
+    Blue = [0, 0, 1, 1]
+    Black = [0, 0, 0, 1]
+    White = [1, 1, 1, 1]
 
 
 class Coords(object):
@@ -93,10 +45,16 @@ class Coords(object):
 
 
 class Action(object):
-    def on_mouse(self, x, y, button, down):
+    def on_mouse_press(self, coord, right, left):
         raise NotImplemented()
 
-    def on_key(self, key, mod):
+    def on_mouse_move(self, *args):
+        raise NotImplemented()
+
+    def on_keyboard(self, *args):
+        raise NotImplemented()
+
+    def on_draw(self, ctx):
         raise NotImplemented()
 
 
@@ -107,39 +65,47 @@ class Drawable(object):
 
 class Polygon(Drawable):
 
-    def __init__(self, coords):
+    def __init__(self, coords, primColor, altColor, fill):
         self.coords = coords
+        self.primColor = primColor
+        self.altColor = altColor
+        self.fill = fill
 
     def draw(self, ctx):
-        print("A drawing was made")
-        ctx.set_source_rgba(1, 0, 0, 1)
+        ctx.set_source_rgba(*self.primColor.value)
         ctx.set_line_width(2)
         ctx.move_to(self.coords[0].x, self.coords[0].y)
         for coord in self.coords:
             ctx.line_to(coord.x, coord.y)
         ctx.line_to(self.coords[0].x, self.coords[0].y)
-        ctx.stroke()
+        if (self.fill):
+            ctx.fill()
+        else:
+            ctx.stroke()
 
 
-class Pen(Action):
+class DrawPolygon(Action):
 
-    def __init__(self, fg, bg):
-        self.__pos = []
-        self.__fg = fg
-        self.__bg = bg
-        self.__started = False
+    def __init__(self, primColor, altColor, fill):
+        self.primColor = primColor
+        self.altColor = altColor
+        self.fill = fill
+        self.coords = []
 
-    def on_mouse(self, x, y, buttons):
-        if (self.__started):
-            return False
+    def on_mouse_press(self, coord, right, left):
+        if (right):
+            self.coords.append(coord)
+        elif (left):
+            return Polygon(self.coords, self.primColor, self.altColor, self.fill)
 
-        if (buttons == self.MAIN_BUTTON):
-            self.__started = True
-            pos = self.__pos
-            if (pos[len(pos)-1].dist(Coords(x, y)) > 0.1):
-                pos.__append(Coords(x, y))
 
-    def on_key(self, key, mod):
+    def on_draw(self, ctx):
+        Polygon(self.coords, self.primColor, self.altColor, self.fill).draw(ctx)
+
+    def on_mouse_move(self, *args):
+        pass
+
+    def on_keyboard(self, *args):
         pass
 
 
@@ -153,7 +119,8 @@ class Drawer(object):
         self.__init_window()
         self.poly = Polygon([Coords(1, 1),
                             Coords(1, 300),
-                            Coords(300, 300)])
+                            Coords(300, 300)],
+                            Color.Red, Color.Blue, True)
 
     def __init_window(self):
         self.__window = Gtk.Window()
