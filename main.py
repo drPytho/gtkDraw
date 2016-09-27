@@ -3,7 +3,8 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk
 from enum import Enum
 import math
-from dolist import DoList
+# from dolist import DoList
+
 
 class Color(Enum):
     """
@@ -15,6 +16,31 @@ class Color(Enum):
     Blue = [0, 0, 1, 1]
     Black = [0, 0, 0, 1]
     White = [1, 1, 1, 1]
+
+
+class Action(object):
+    def on_mouse_release(self, coord, right, left):
+        raise NotImplemented()
+
+    def on_mouse_press(self, coord, right, left):
+        raise NotImplemented()
+
+    def on_mouse_move(self, *args):
+        raise NotImplemented()
+
+    def on_keyboard(self, *args):
+        raise NotImplemented()
+
+    def on_draw(self, ctx):
+        raise NotImplemented()
+
+    def save(self):
+        raise NotImplemented()
+
+
+class Drawable(object):
+    def draw(self, context):
+        raise NotImplemented()
 
 
 class Coords(object):
@@ -44,25 +70,6 @@ class Coords(object):
     __rmul__ = __mul__
 
 
-class Action(object):
-    def on_mouse_press(self, coord, right, left):
-        raise NotImplemented()
-
-    def on_mouse_move(self, *args):
-        raise NotImplemented()
-
-    def on_keyboard(self, *args):
-        raise NotImplemented()
-
-    def on_draw(self, ctx):
-        raise NotImplemented()
-
-
-class Drawable(object):
-    def draw(self, context):
-        raise NotImplemented()
-
-
 class Polygon(Drawable):
 
     def __init__(self, coords, primColor, altColor, fill):
@@ -72,6 +79,8 @@ class Polygon(Drawable):
         self.fill = fill
 
     def draw(self, ctx):
+        if (len(self.coords) == 0):
+            return
         ctx.set_source_rgba(*self.primColor.value)
         ctx.set_line_width(2)
         ctx.move_to(self.coords[0].x, self.coords[0].y)
@@ -87,20 +96,19 @@ class Polygon(Drawable):
 class DrawPolygon(Action):
 
     def __init__(self, primColor, altColor, fill):
-        self.primColor = primColor
-        self.altColor = altColor
-        self.fill = fill
-        self.coords = []
+        self.poly = Polygon([], primColor, altColor, fill)
 
-    def on_mouse_press(self, coord, right, left):
+    def save(self):
+        return self.poly
+
+    def on_mouse_release(self, coord, right, left):
         if (right):
-            self.coords.append(coord)
+            self.poly.coords.append(coord)
         elif (left):
-            return Polygon(self.coords, self.primColor, self.altColor, self.fill)
-
+            return self.save()
 
     def on_draw(self, ctx):
-        Polygon(self.coords, self.primColor, self.altColor, self.fill).draw(ctx)
+        self.poly.draw(ctx)
 
     def on_mouse_move(self, *args):
         pass
@@ -108,19 +116,23 @@ class DrawPolygon(Action):
     def on_keyboard(self, *args):
         pass
 
+    def on_mouse_press(self, coord, right, left):
+        pass
+
 
 class Drawer(object):
 
     def __init__(self):
-        self.__doli = DoList()
-        self.__fg = Color.Black
-        self.__bg = Color.White
-        self.__curr_action = None
+        # self.__doli = DoList()
+        self.__doli = []
+
+        self.__primary = Color.Black
+        self.__secondary = Color.White
+
+        self.__selected_action = DrawPolygon
+        self.__action = DrawPolygon(self.__primary, self.__secondary, True)
+
         self.__init_window()
-        self.poly = Polygon([Coords(1, 1),
-                            Coords(1, 300),
-                            Coords(300, 300)],
-                            Color.Red, Color.Blue, True)
 
     def __init_window(self):
         self.__window = Gtk.Window()
@@ -135,27 +147,39 @@ class Drawer(object):
         draw_area.connect("button-press-event", self.on_mouse_press)
         draw_area.connect("button-release-event", self.on_mouse_release)
         draw_area.connect("draw", self.on_draw)
+        self.__draw_area = draw_area
         w.add(draw_area)
 
     def run(self):
         self.__window.show_all()
         Gtk.main()
 
-    def on_draw(self, widget, cr):
+    def on_draw(self, widget, ctx):
         # Draw the stack
         print("Drawing")
-        self.poly.draw(cr)
         for drawable in self.__doli:
-            drawable.draw(cr)
+            drawable.draw(ctx)
+
+        self.__action.on_draw(ctx)
 
     def on_mouse_move(self, widget, event):
-        print("Move", event.x, event.y)
+        # print("Move", event.x, event.y)
+        self.__action.on_mouse_move(event)
 
     def on_mouse_release(self, widget, event):
-        print("Release", event.x, event.y)
+        # print("Release", event.x, event.y)
+        ret = self.__action.on_mouse_release(Coords(event.x, event.y),
+                                       event.button == 1, event.button == 3)
+        if (ret is not None):
+            self.__doli.append(ret)
+            self.__action = DrawPolygon(self.__fg, self.__bg, True)
+
+        self.__draw_area.queue_draw()
 
     def on_mouse_press(self, widget, event):
-        print("Press", event.x, event.y)
+        # print("Press", event.x, event.y)
+        self.__action.on_mouse_release(Coords(event.x, event.y),
+                                       event.button == 3, event.button == 1)
 
 
 def main():
