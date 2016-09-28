@@ -1,6 +1,7 @@
 import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk
+import cairo
 from util import Color, Coords
 from drawables import DrawLine, DrawPolygon, DrawCircle
 
@@ -42,6 +43,14 @@ class Drawer(object):
     def run(self):
         self.__window.show_all()
         Gtk.main()
+
+    def save(self, name, width, height):
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+        ctx = cairo.Context(surface)
+        for drawable in self.__doli:
+            drawable.draw(ctx)
+
+        surface.write_to_png(name)
 
     def on_draw(self, widget, ctx):
         # Draw the stack
@@ -107,10 +116,11 @@ class Drawer(object):
 
         if (event.keyval == Gdk.KEY_z and
             event.state & Gdk.ModifierType.CONTROL_MASK):
-            print("<CTRL>z")
             if (len(self.__doli) != 0):
                 del self.__doli[-1]
-
+        if (event.keyval == Gdk.KEY_s and
+            event.state & Gdk.ModifierType.CONTROL_MASK):
+            self.save("best_picture", 1920, 1080)
         self.__draw_area.queue_draw()
 
 
