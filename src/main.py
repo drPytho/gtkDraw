@@ -6,18 +6,109 @@ from util import Color, Coords
 from drawables import DrawLine, DrawPolygon, DrawCircle
 
 
+class SaveDialog(Gtk.Window):
+
+    def __init__(self, name, width, height, doli, cb):
+        self.name = name
+        self.height = height
+        self.width = width
+        self.doli = doli
+        self.cb = cb
+
+        Gtk.Window.__init__(self, title="Save Dialog")
+        self.set_default_size(200, 100)
+        self.set_type_hint(Gtk.WindowType.POPUP)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self.add(vbox)
+
+        label = Gtk.Label(label="Save As:")
+        vbox.add(label)
+
+        hbox = Gtk.Box(spacing=6)
+        vbox.add(hbox)
+
+        text_in = Gtk.Entry()
+        text_in.set_text(name)
+        hbox.add(text_in)
+
+        save_button = Gtk.Button(label="Save")
+        save_button.connect("clicked", self.save)
+        hbox.add(save_button)
+
+        self.text_in = text_in
+        self.show_all()
+
+    def save(self, widget):
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.width, self.height)
+        ctx = cairo.Context(surface)
+        # Draw a white background
+        ctx.set_source_rgba(1,1,1,1)
+        ctx.move_to(0, 0)
+        ctx.line_to(self.width, 0)
+        ctx.line_to(self.width, self.height)
+        ctx.line_to(0, self.height)
+        ctx.line_to(0, 0)
+        ctx.fill()
+
+
+        for drawable in self.doli:
+            drawable.draw(ctx)
+
+        surface.write_to_png(self.text_in.get_text() + ".png")
+        self.destroy()
+        self.cb()
+
+
+class ColorDialog(Gtk.Window):
+
+    def __init__(self, cb):
+        self.cb = cb
+
+        Gtk.Window.__init__(self, title="Color Picker")
+        self.set_default_size(300, 200)
+        self.set_type_hint(Gtk.WindowType.POPUP)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self.add(vbox)
+
+        label = Gtk.Label(label="Set color as hex")
+        vbox.add(label)
+
+        hbox = Gtk.Box(spacing=6)
+        vbox.add(hbox)
+
+        poundLabel = Gtk.Label(label="#")
+        hbox.add(poundLabel)
+        text_in = Gtk.Entry()
+        hbox.add(text_in)
+
+        set_button = Gtk.Button(label="Set Color")
+        set_button.connect("clicked", self.set_color)
+        hbox.add(set_button)
+
+        self.text_in = text_in
+        self.show_all()
+
+    def set_color(self, widget):
+        color = self.text_in.get_text()
+        c = Color(color)
+        self.destroy()
+        self.cb(c)
+
+
 class Drawer(object):
 
     def __init__(self):
         # self.__doli = DoList()
         self.__doli = []
 
-        self.__primary = Color.Black
-        self.__secondary = Color.White
+        self.__primary = Color(Color.Black)
+        self.__secondary = Color(Color.White)
         self.__fill = True
 
         self.__selected_action = DrawLine
-        self.__action = DrawLine(self.__primary, self.__secondary, self.__fill)
+        self.new_action()
 
         self.__init_window()
 
@@ -45,12 +136,19 @@ class Drawer(object):
         Gtk.main()
 
     def save(self, name, width, height):
-        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
-        ctx = cairo.Context(surface)
-        for drawable in self.__doli:
-            drawable.draw(ctx)
+        def cb():
+            self.sd.destroy()
+            self.sd = None
 
-        surface.write_to_png(name)
+        self.sd = SaveDialog(name, width, height, self.__doli, cb)
+
+    def select_color(self):
+        def cb(color):
+            self.__primary = color
+            self.new_action()
+            self.cd = None
+
+        self.cd = ColorDialog(cb)
 
     def on_draw(self, widget, ctx):
         # Draw the stack
@@ -71,7 +169,7 @@ class Drawer(object):
                                              event.button == Gdk.BUTTON_SECONDARY)
         if (ret is not None):
             self.__doli.append(ret)
-            self.__action = self.__selected_action(self.__primary, self.__secondary, self.__fill)
+            self.new_action()
 
         self.__draw_area.queue_draw()
 
@@ -81,46 +179,52 @@ class Drawer(object):
                                      event.button == Gdk.BUTTON_SECONDARY)
         if (ret is not None):
             self.__doli.append(ret)
-            self.__action = self.__selected_action(self.__primary, self.__secondary, self.__fill)
+            self.new_action()
 
         self.__draw_area.queue_draw()
 
-    def kill_action(self):
+    def new_action(self):
         self.__action = self.__selected_action(self.__primary,
                                                self.__secondary,
                                                self.__fill)
 
     def on_keyboard(self, widget, event):
         if (event.keyval == Gdk.KEY_Escape):
-            # Kill the current action
-            self.kill_action()
+            # renew the current action
+            self.new_action()
 
         if (event.keyval == Gdk.KEY_q):
             Gtk.main_quit()
 
         if (event.keyval == Gdk.KEY_p):
             self.__selected_action = DrawPolygon
-            self.kill_action()
+            self.new_action()
 
         if (event.keyval == Gdk.KEY_l):
             self.__selected_action = DrawLine
-            self.kill_action()
+            self.new_action()
 
         if (event.keyval == Gdk.KEY_c):
             self.__selected_action = DrawCircle
-            self.kill_action()
+            self.new_action()
 
         if (event.keyval == Gdk.KEY_f):
             self.__fill = not self.__fill
-            self.kill_action()
+            self.new_action()
 
         if (event.keyval == Gdk.KEY_z and
             event.state & Gdk.ModifierType.CONTROL_MASK):
             if (len(self.__doli) != 0):
                 del self.__doli[-1]
+
         if (event.keyval == Gdk.KEY_s and
             event.state & Gdk.ModifierType.CONTROL_MASK):
             self.save("best_picture", 1920, 1080)
+
+        if (event.keyval == Gdk.KEY_d and
+            event.state & Gdk.ModifierType.CONTROL_MASK):
+            self.select_color()
+
         self.__draw_area.queue_draw()
 
 
