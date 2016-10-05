@@ -1,20 +1,38 @@
 import math
-from enum import Enum
 
 
-class Color(Enum):
+class Color(object):
     """
     Enum Color class for easy access to different
     colors.
     """
-    Red = [1, 0, 0, 1]
-    Green = [0, 1, 0, 1]
-    Blue = [0, 0, 1, 1]
-    Black = [0, 0, 0, 1]
-    White = [1, 1, 1, 1]
+    # A set of standar colors
+    Red = (1, 0, 0, 1)
+    Green = (0, 1, 0, 1)
+    Blue = (0, 0, 1, 1)
+    Black = (0, 0, 0, 1)
+    White = (1, 1, 1, 1)
+
+    def __init__(self, val):
+        # Check if tuple
+        if (type(val) is tuple):
+            self.val = val
+        # Check if string
+        elif (isinstance(val, str)):
+            self.from_string(val)
+        else:
+            # Set standard color
+            self.val = self.Black
+
+    def from_string(self, color_string):
+        color_string += "FF"
+        self.val = tuple(int(color_string[i:i+2], 16)/255 for i in (0, 2 ,4, 6))
 
 
 class Coords(object):
+    """
+    A class to handel and work with coordiantes
+    """
 
     def __init__(self, x, y):
         self.x = x

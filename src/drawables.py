@@ -40,7 +40,7 @@ class Polygon(Drawable):
     def draw(self, ctx):
         if (len(self.coords) == 0):
             return
-        ctx.set_source_rgba(*self.primColor.value)
+        ctx.set_source_rgba(*self.primColor.val)
         ctx.set_line_width(2)
         ctx.move_to(self.coords[0].x, self.coords[0].y)
         for coord in self.coords:
@@ -61,7 +61,7 @@ class Line(Drawable):
     def draw(self, ctx):
         if (len(self.coords) != 2):
             return
-        ctx.set_source_rgba(*self.color.value)
+        ctx.set_source_rgba(*self.color.val)
         ctx.set_line_width(2)
         ctx.move_to(self.coords[0].x, self.coords[0].y)
         ctx.line_to(self.coords[1].x, self.coords[1].y)
@@ -77,7 +77,7 @@ class Circle(Drawable):
         self.fill = fill
 
     def draw(self, ctx):
-        ctx.set_source_rgba(*self.color.value)
+        ctx.set_source_rgba(*self.color.val)
         ctx.set_line_width(2)
         ctx.arc(self.center.x, self.center.y, self.rad, 0, 2*math.pi)
         if (self.fill):
